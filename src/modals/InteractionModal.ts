@@ -20,7 +20,7 @@ export class InteractionModal extends Modal {
 		contentEl.empty();
 
 		contentEl.createEl("h2", {
-			text: this.interaction ? "Edit interaction" : "Add interaction",
+			text: this.interaction ? "编辑互动记录" : "添加互动记录",
 		});
 
 		const form = contentEl.createEl("form");
@@ -54,7 +54,7 @@ export class InteractionModal extends Modal {
 		// Text input
 		const textInput = form.createEl("textarea", {
 			attr: {
-				placeholder: "What happened?",
+				placeholder: "记录这次互动的内容……",
 				required: "true",
 			},
 			cls: "contact-interaction-text-input",
@@ -63,7 +63,7 @@ export class InteractionModal extends Modal {
 
 		// Submit button
 		form.createEl("button", {
-			text: this.interaction ? "Save changes" : "Add interaction",
+			text: this.interaction ? "保存修改" : "添加互动记录",
 			attr: { type: "submit" },
 			cls: "friend-tracker-button button-primary",
 		});

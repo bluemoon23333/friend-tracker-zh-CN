@@ -7,7 +7,15 @@ import {
 	normalizePath,
 } from "obsidian";
 import type FriendTracker from "@/main";
-import type { ContactWithCountdown } from "@/types";
+import type {
+	ContactWithCountdown,
+	InteractionMode,
+	MentionSearchScope,
+} from "@/types";
+import {
+	ContactPageView,
+	VIEW_TYPE_CONTACT_PAGE,
+} from "@/views/ContactPageView";
 
 class FolderSuggest extends AbstractInputSuggest<string> {
 	inputEl: HTMLInputElement;
@@ -51,21 +59,21 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 			value: keyof Omit<ContactWithCountdown, "file">;
 			label: string;
 		}> = [
-			{ value: "name", label: "Name" },
-			{ value: "age", label: "Age" },
-			{ value: "birthday", label: "Birthday" },
-			{ value: "daysUntilBirthday", label: "Days until birthday" },
-			{ value: "relationship", label: "Relationship" },
-			{ value: "lastInteraction", label: "Last interaction" },
+			{ value: "name", label: "姓名" },
+			{ value: "age", label: "年龄" },
+			{ value: "birthday", label: "生日" },
+			{ value: "daysUntilBirthday", label: "距离生日天数" },
+			{ value: "relationship", label: "关系" },
+			{ value: "lastInteraction", label: "最近互动" },
 		];
 
 		new Setting(containerEl)
-			.setName("Contacts folder")
-			.setDesc("Folder where contact files will be stored")
+			.setName("联系人文件夹")
+			.setDesc("用于存放联系人文件的文件夹")
 			.addText((text) => {
 				new FolderSuggest(this.app, text.inputEl);
 				return text
-					.setPlaceholder("Enter folder name")
+					.setPlaceholder("输入文件夹名称")
 					.setValue(this.plugin.settings.contactsFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.contactsFolder =
@@ -75,8 +83,8 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName("Default sort")
-			.setDesc("Choose how contacts are sorted by default")
+			.setName("默认排序")
+			.setDesc("选择联系人的默认排序方式")
 			.addDropdown((dropdown) => {
 				sortColumns.forEach(({ value, label }) => {
 					dropdown.addOption(value, label);
@@ -91,8 +99,8 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 			})
 			.addDropdown((dropdown) => {
 				dropdown
-					.addOption("asc", "Ascending")
-					.addOption("desc", "Descending")
+					.addOption("asc", "升序")
+					.addOption("desc", "降序")
 					.setValue(this.plugin.settings.defaultSortDirection)
 					.onChange(async (value) => {
 						this.plugin.settings.defaultSortDirection = value as
@@ -106,14 +114,14 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 			cls: "friend-tracker-relationship-header",
 		});
 
-		headerContainer.createEl("h3", { text: "Relationship types" });
+		headerContainer.createEl("h3", { text: "关系类型" });
 
 		new Setting(headerContainer).addButton((button) =>
-			button.setButtonText("Add relationship type").onClick(async () => {
+			button.setButtonText("添加关系类型").onClick(async () => {
 				// Create a temporary input field
 				const tempInput = document.createElement("input");
 				tempInput.type = "text";
-				tempInput.placeholder = "Enter relationship type";
+				tempInput.placeholder = "输入关系类型";
 				tempInput.className =
 					"friend-tracker-modal-input relationship-type-input";
 
@@ -171,7 +179,7 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 				.addText((text) =>
 					text
 						.setValue(type)
-						.setPlaceholder("Type name")
+						.setPlaceholder("类型名称")
 						.then((textComponent) => {
 							// Save on Enter
 							textComponent.inputEl.addEventListener(
@@ -221,7 +229,7 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 				.addExtraButton((button) => {
 					button
 						.setIcon("trash")
-						.setTooltip("Delete relationship type")
+						.setTooltip("删除关系类型")
 						.onClick(async () => {
 							const index =
 								this.plugin.settings.relationshipTypes.indexOf(
@@ -238,12 +246,12 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(containerEl)
-			.setName("Default tab")
-			.setDesc("Choose which tab opens by default")
+			.setName("默认标签页")
+			.setDesc("选择联系人页面默认打开的标签页")
 			.addDropdown((dropdown) => {
 				dropdown
-					.addOption("notes", "Notes")
-					.addOption("interactions", "Interactions")
+					.addOption("notes", "笔记")
+					.addOption("interactions", "互动记录")
 					.addOption("markdown", "Markdown")
 					.setValue(this.plugin.settings.defaultActiveTab)
 					.onChange(
@@ -254,6 +262,73 @@ export class FriendTrackerSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}
 					);
+			});
+		new Setting(containerEl)
+			.setName("互动记录模式")
+			.setDesc("选择联系人页面「互动记录」标签页的展示方式，切换后已打开的联系人页面会立即刷新；「提及记录」模式下，主列表的「最近互动」会按库中的提及推算")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("manual", "手动记录（默认）")
+					.addOption(
+						"mentions",
+						"提及记录（显示库中提及该联系人的内容）"
+					)
+					.setValue(this.plugin.settings.interactionMode)
+					.onChange(async (value) => {
+						this.plugin.settings.interactionMode =
+							value as InteractionMode;
+						await this.plugin.saveSettings();
+						this.refreshContactViews();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("提及搜索范围")
+			.setDesc("「提及记录」模式的搜索范围：搜索整个库，或只搜索指定文件夹")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("vault", "整个库")
+					.addOption("folder", "指定文件夹")
+					.setValue(this.plugin.settings.mentionsSearchScope)
+					.onChange(async (value) => {
+						this.plugin.settings.mentionsSearchScope =
+							value as MentionSearchScope;
+						await this.plugin.saveSettings();
+						this.refreshContactViews();
+						this.display();
+					});
+			});
+
+		if (this.plugin.settings.mentionsSearchScope === "folder") {
+			new Setting(containerEl)
+				.setName("提及搜索文件夹")
+				.setDesc("只搜索该文件夹及其子文件夹中提到该联系人的内容")
+				.addText((text) => {
+					new FolderSuggest(this.app, text.inputEl);
+					text.inputEl.addEventListener("blur", () => {
+						this.refreshContactViews();
+					});
+					return text
+						.setPlaceholder("如：日记")
+						.setValue(this.plugin.settings.mentionsFolder)
+						.onChange(async (value) => {
+							this.plugin.settings.mentionsFolder =
+								normalizePath(value);
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+
+	}
+
+	private refreshContactViews() {
+		this.app.workspace
+			.getLeavesOfType(VIEW_TYPE_CONTACT_PAGE)
+			.forEach((leaf) => {
+				const view = leaf.view;
+				if (view instanceof ContactPageView) {
+					view.render();
+				}
 			});
 	}
 }

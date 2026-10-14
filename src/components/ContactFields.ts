@@ -1,6 +1,7 @@
 import type { ContactPageView } from "@/views/ContactPageView";
 import { STANDARD_FIELDS } from "@/constants";
 import type FriendTracker from "@/main";
+import { parseBirthday, toBirthdayString } from "@/utils/birthday";
 
 export function createRelationshipInput(
 	container: HTMLElement,
@@ -13,7 +14,7 @@ export function createRelationshipInput(
 		attr: {
 			type: "text",
 			value: value || "",
-			placeholder: "Friend, Family, Colleague, etc.",
+			placeholder: "朋友、家人、同事等",
 			list: "relationship-types",
 			autocomplete: "on",
 			role: "combobox",
@@ -57,6 +58,108 @@ export function createRelationshipInput(
 	}
 
 	return input;
+}
+
+// 生日输入组件：支持「只填月日、不填年份」的写法
+export interface BirthdayInputHandle {
+	wrapper: HTMLElement;
+	// 读取当前填写的生日，格式不合法时返回空字符串
+	getValue: () => string;
+	// 输入内容是否合法（留空视为合法）
+	isValid: () => boolean;
+}
+
+export function createBirthdayInput(
+	container: HTMLElement,
+	value: string = "",
+	onChange?: (value: string) => void
+): BirthdayInputHandle {
+	const parsed = parseBirthday(value);
+
+	const wrapper = container.createEl("div", {
+		cls: "friend-tracker-birthday-inputs",
+	});
+
+	const monthDayInput = wrapper.createEl("input", {
+		cls: "contact-field-input",
+		attr: {
+			type: "text",
+			inputmode: "numeric",
+			placeholder: "月-日，如 08-16",
+			value: parsed
+				? toBirthdayString(null, parsed.month, parsed.day)
+				: "",
+		},
+	});
+
+	const yearInput = wrapper.createEl("input", {
+		cls: "contact-field-input friend-tracker-birthday-year",
+		attr: {
+			type: "text",
+			inputmode: "numeric",
+			placeholder: "出生年份（可选）",
+			value: parsed && parsed.year ? String(parsed.year) : "",
+		},
+	});
+
+	wrapper.createEl("div", {
+		cls: "friend-tracker-birthday-hint",
+		text: "只知道生日、不知道年份时，只填「月-日」即可。",
+	});
+
+	let lastEmitted: string | null = null;
+
+	const readValue = () => {
+		const rawMonthDay = monthDayInput.value.trim();
+		const rawYear = yearInput.value.trim();
+		const monthDay = rawMonthDay ? parseBirthday(rawMonthDay) : null;
+		const monthDayInvalid =
+			(rawMonthDay !== "" && !monthDay) ||
+			(rawMonthDay === "" && rawYear !== "");
+		const yearInvalid = rawYear !== "" && !/^\d{4}$/.test(rawYear);
+
+		return { rawYear, monthDay, monthDayInvalid, yearInvalid };
+	};
+
+	const getValue = () => {
+		const current = readValue();
+		if (current.monthDayInvalid || current.yearInvalid) return "";
+		if (!current.monthDay) return "";
+		const year = current.rawYear === "" ? null : Number(current.rawYear);
+		return toBirthdayString(
+			year,
+			current.monthDay.month,
+			current.monthDay.day
+		);
+	};
+
+	const isValid = () => {
+		const current = readValue();
+		return !current.monthDayInvalid && !current.yearInvalid;
+	};
+
+	const emit = () => {
+		const current = readValue();
+		monthDayInput.classList.toggle(
+			"is-invalid",
+			current.monthDayInvalid
+		);
+		yearInput.classList.toggle("is-invalid", current.yearInvalid);
+		if (current.monthDayInvalid || current.yearInvalid) return;
+
+		const composed = getValue();
+		if (composed !== lastEmitted) {
+			lastEmitted = composed;
+			if (onChange) onChange(composed);
+		}
+	};
+
+	monthDayInput.addEventListener("change", emit);
+	monthDayInput.addEventListener("blur", emit);
+	yearInput.addEventListener("change", emit);
+	yearInput.addEventListener("blur", emit);
+
+	return { wrapper, getValue, isValid };
 }
 
 export class ContactFields {
@@ -105,20 +208,9 @@ export class ContactFields {
 	}
 
 	private createBirthdayField(container: HTMLElement, value: string) {
-		const input = container.createEl("input", {
-			cls: "contact-field-input",
-			attr: {
-				type: "date",
-				value: value || "",
-				placeholder: "YYYY-MM-DD",
-				pattern: "\\d{4}-\\d{2}-\\d{2}",
-			},
-		});
-
-		input.addEventListener("change", async () => {
+		createBirthdayInput(container, value, async (newValue) => {
 			if (!this.view.file) return;
-			const formattedDate = input.value;
-			await this.view.updateContactData("birthday", formattedDate);
+			await this.view.updateContactData("birthday", newValue);
 		});
 	}
 
@@ -128,7 +220,7 @@ export class ContactFields {
 			attr: {
 				type: "tel",
 				value: value || "",
-				placeholder: "+1234567890",
+				placeholder: "13800000000",
 				pattern: "^[0-9+\\-]*$", // Allow only numbers, +, and -
 			},
 		});
@@ -153,7 +245,7 @@ export class ContactFields {
 			attr: {
 				type: "text",
 				value: value || "",
-				placeholder: "Not set",
+				placeholder: "未设置",
 			},
 		});
 

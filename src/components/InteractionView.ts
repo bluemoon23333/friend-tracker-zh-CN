@@ -31,7 +31,7 @@ export class InteractionView {
 		// Format date nicely, adjusting for timezone
 		const [year, month, day] = interaction.date.split("-").map(Number);
 		const date = new Date(year, month - 1, day);
-		const formattedDate = date.toLocaleDateString(undefined, {
+		const formattedDate = date.toLocaleDateString("zh-CN", {
 			year: "numeric",
 			month: "short",
 			day: "numeric",
@@ -57,7 +57,7 @@ export class InteractionView {
 		// Edit button
 		const editBtn = actions.createEl("button", {
 			cls: "friend-tracker-button button-icon",
-			attr: { "aria-label": "Edit interaction" },
+			attr: { "aria-label": "编辑互动记录" },
 		});
 		setIcon(editBtn, "pencil");
 		editBtn.addEventListener("click", () => {
@@ -67,7 +67,7 @@ export class InteractionView {
 		// Delete button
 		const deleteBtn = actions.createEl("button", {
 			cls: "friend-tracker-button button-icon button-danger",
-			attr: { "aria-label": "Delete interaction" },
+			attr: { "aria-label": "删除互动记录" },
 		});
 		setIcon(deleteBtn, "trash");
 		deleteBtn.addEventListener("click", () => {

@@ -78,7 +78,7 @@ export class FriendTrackerView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Friend tracker";
+		return "好友追踪";
 	}
 
 	async onOpen() {

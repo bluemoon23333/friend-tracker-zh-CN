@@ -1,81 +1,102 @@
-# Friend Tracker for Obsidian
+# 好友追踪（Friend Tracker）for Obsidian
 
-A plugin for Obsidian that helps you keep track of friends, family, and your interactions with them. Never forget a birthday or important detail about someone you care about.
+一款 Obsidian 插件，帮助你记录朋友、家人以及与他们的每一次互动。再也不会忘记你在意的人的生日或重要细节。
 
-## Inspiration
+> 本仓库是 [buzzguy/friend-tracker](https://github.com/buzzguy/friend-tracker) 的简体中文汉化版：界面提示、按钮、通知与显示文本均已汉化为简体中文。
 
-This plugin was inspired by [Scott Stockdale's article on maintaining meaningful friendships](https://web.archive.org/web/20250409205126/https://entrepreneurscanparty.com/posts/how-to-be-a-more-awesome-friend). The core idea is that maintaining strong relationships requires a system for:
+## 灵感来源
 
--   Tracking important dates and milestones
--   Recording meaningful interactions
--   Remembering personal details
--   Making regular meaningful touchpoints
+本插件的灵感来自 [Scott Stockdale 关于如何维护有意义友谊的文章](https://web.archive.org/web/20250409205126/https://entrepreneurscanparty.com/posts/how-to-be-a-more-awesome-friend)。核心理念是：维系牢固的人际关系需要一套系统来：
 
-Friend Tracker helps implement these relationship-building practices in a simple, organized way within Obsidian.
+-   记录重要日期与纪念日
+-   记录有意义的互动
+-   记住个人细节
+-   保持定期而有意义的联系
+
+好友追踪以简单、有条理的方式，在 Obsidian 中帮你落实这些维护人际关系的做法。
 
 ![image](https://github.com/user-attachments/assets/0f8ef3de-6c18-4813-a87a-1a7d5d1a680f)
 
-## Features
+## 功能特性
 
--   **Contact Management**: Easily create and manage contact profiles with essential information
--   **Birthday Tracking**: Keep track of birthdays and see upcoming celebrations
--   **Interaction Logging**: Record and date your interactions with people
--   **Custom Fields**: Add custom fields to track any information that matters to you
--   **Notes Section**: Keep detailed notes about family members, relationships, or any other important details
--   **Smart Organization**: Sort contacts by name, age, or upcoming birthdays
+-   **联系人管理**：轻松创建和管理包含关键信息的联系人档案
+-   **生日追踪**：记录生日，查看即将到来的庆祝日期；出生年份可以留空，只知道月日也能正常使用
+-   **互动记录**：记录并标注与每个人的互动；也可以在设置中切换为「提及记录」模式，直接展示库中所有提到该联系人的笔记内容
+-   **自定义字段**：添加自定义字段，记录任何你在意的信息
+-   **备注区域**：为家庭成员、人际关系或其他重要细节做详细备注
+-   **智能整理**：按姓名、年龄或即将到来的生日排序联系人
 
-## Usage
+## 使用方法
 
-### Creating Contacts
+### 创建联系人
 
-1. Click the "Add Contact" button to create a new contact
-2. Fill in their basic information (name, birthday, email, phone)
-3. Add any custom fields you want to track
-4. Use the notes section for additional details
+1. 点击「添加联系人」按钮创建新联系人
+2. 填写基本信息（姓名、生日、邮箱、电话）
+3. 添加你想跟踪的自定义字段
+4. 在备注区记录补充细节
 
-### Tracking Interactions
+### 记录互动
 
-1. Open a contact's profile
-2. Click "Add Interaction" to log a new interaction
-3. Enter the date and details of the interaction
-4. View interaction history in chronological order
+1. 打开联系人页面
+2. 点击「添加互动记录」记录一次新互动
+3. 填写互动的日期与详情
+4. 按时间顺序查看互动历史
 
-### Managing Birthdays
+### 管理生日
 
--   The main view shows upcoming birthdays
--   Sort by "Days Until Birthday" to see who's celebrating soon
--   Birthdays are automatically calculated and displayed in a friendly format
+-   主视图展示即将到来的生日
+-   按「距生日天数」排序，看看谁快过生日了
+-   生日会自动计算，并以直观的格式显示
 
-### Custom Fields
+### 自定义字段
 
--   Add custom fields to track specific information
--   Fields are saved in the contact's YAML frontmatter
--   Easily edit or update field values
+-   添加自定义字段以记录特定信息
+-   字段保存在联系人笔记的 YAML 前置元数据（frontmatter）中
+-   随时轻松编辑或更新字段值
 
-## Installation
+### 互动记录模式
 
-1. Open Obsidian Settings
-2. Go to Community Plugins and disable Safe Mode
-3. Click Browse and search for "Friend Tracker"
-4. Install the plugin and enable it
+在 设置 → 好友追踪 → 互动记录模式 中可以在两种模式之间切换：
 
-## Storage
+-   **手动记录（默认）**：手动添加、编辑互动记录，数据保存在联系人的 YAML 前置元数据中
+-   **提及记录**：不显示手动记录，而是展示整个库中提到该联系人的笔记内容（相当于反向链接面板中的「提及」），点击可直接跳转到对应笔记。适合习惯在日记中记录互动、通过提及联系人的用户
+-   提及列表右上角的「排序方式」菜单与 Obsidian 入链面板一致，可按文件名（A-Z / Z-A）、编辑时间（从新到旧 / 从旧到新）、创建时间（从新到旧 / 从旧到新）排序，选择会被记住
+-   搜索范围可在设置中切换：**整个库**（默认）或**指定文件夹**（只搜索该文件夹及其子文件夹）；选择「指定文件夹」后，设置中会出现文件夹选择项
+-   联系人可以填写「别名」字段（保存在 YAML 的 `aliases` 中，与 Obsidian 别名写法一致，支持多个）；提及检索会同时匹配姓名与所有别名，通过别名命中的条目会标注「别名匹配」
+-   「提及记录」模式下，主列表的「最近互动」会按库中的提及推算：优先取日记类文件名中的日期（如 `2026-10-14`），取不到时用笔记的修改时间；该列可以像其他列一样点击表头排序，鼠标悬停单元格还能看到来源笔记
 
-All contact information is stored in markdown files with YAML frontmatter, making it:
+### 生日只知道月日
 
--   Portable
--   Future-proof
--   Easy to backup
--   Compatible with other markdown tools
+-   创建或编辑联系人时，生日分为「月-日」与「出生年份（可选）」两项
+-   只知道生日、不知道出生年份时，只填「月-日」即可，例如 `08-16`
+-   年份留空时不会显示年龄和生肖，但生日倒计时、星座、季节和诞生石照常显示
 
-## Support
+## 安装
 
-If you encounter any issues or have feature requests, please visit the [GitHub repository](https://github.com/buzzguy/friend-tracker/issues).
+手动安装本汉化版：
 
-## Author
+1. 下载 `main.js`、`manifest.json`、`styles.css` 三个文件
+2. 在仓库中创建目录 `.obsidian/plugins/friend-tracker/`
+3. 将三个文件放入该目录
+4. 打开 Obsidian 设置，在「第三方插件」中启用「好友追踪」
 
-Created by [Dan Au](https://dausign.com)
+## 数据存储
 
-## License
+所有联系人信息都以带 YAML 前置元数据的 Markdown 文件保存，因此：
 
-MIT License - see LICENSE for details
+-   便于迁移
+-   面向未来
+-   易于备份
+-   兼容其他 Markdown 工具
+
+## 支持
+
+如果遇到问题或有功能建议，请访问 [GitHub 仓库](https://github.com/buzzguy/friend-tracker/issues)。
+
+## 作者
+
+由 [Dan Au](https://dausign.com) 创建；本仓库为其简体中文汉化版本。
+
+## 许可证
+
+MIT 许可证，详见 LICENSE

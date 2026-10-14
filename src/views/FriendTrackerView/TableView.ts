@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import type { FriendTrackerView } from "./index";
 import type { ContactWithCountdown, SortConfig } from "@/types";
+import { parseBirthday } from "@/utils/birthday";
 
 export class TableView {
 	constructor(private view: FriendTrackerView) {}
@@ -14,10 +15,10 @@ export class TableView {
 		const headerContainer = container.createEl("div", {
 			cls: "friend-tracker-header",
 		});
-		headerContainer.createEl("h2", { text: "Friend tracker" });
+		headerContainer.createEl("h2", { text: "好友追踪" });
 
 		const addButton = headerContainer.createEl("button", {
-			text: "Add contact",
+			text: "添加联系人",
 			cls: "friend-tracker-button button-outlined",
 		});
 		addButton.addEventListener("click", () =>
@@ -33,7 +34,7 @@ export class TableView {
 				cls: "friend-tracker-empty-state",
 			});
 			emptyState.createEl("p", {
-				text: "No contacts found. Get started by creating your first contact!",
+				text: "暂无联系人。创建第一位联系人，开始使用吧！",
 			});
 			return;
 		}
@@ -59,14 +60,14 @@ export class TableView {
 			label: string;
 			sortable?: boolean;
 		}> = [
-			{ key: "name", label: "Name", sortable: true },
-			{ key: "age", label: "Age", sortable: true },
-			{ key: "birthday", label: "Birthday", sortable: true },
-			{ key: "daysUntilBirthday", label: "Days left", sortable: true },
-			{ key: "relationship", label: "Type", sortable: true },
+			{ key: "name", label: "姓名", sortable: true },
+			{ key: "age", label: "年龄", sortable: true },
+			{ key: "birthday", label: "生日", sortable: true },
+			{ key: "daysUntilBirthday", label: "距生日天数", sortable: true },
+			{ key: "relationship", label: "关系", sortable: true },
 			{
 				key: "lastInteraction",
-				label: "Last interaction",
+				label: "最近互动",
 				sortable: true,
 			},
 			{ key: "actions", label: "", sortable: false },
@@ -129,21 +130,29 @@ export class TableView {
 			});
 
 			// Rest of the cells (no click handlers)
-			row.createEl("td", { text: contact.age?.toString() || "N/A" });
+			row.createEl("td", { text: contact.age?.toString() || "—" });
 			row.createEl("td", {
-				text: contact.formattedBirthday || "N/A",
+				text: contact.formattedBirthday || "—",
 			});
 			row.createEl("td", {
 				text:
 					contact.daysUntilBirthday !== null
-						? `${contact.daysUntilBirthday} days`
-						: "N/A",
+						? `${contact.daysUntilBirthday} 天`
+						: "—",
 			});
 			row.createEl("td", {
-				text: contact.relationship || "N/A",
+				text: contact.relationship || "—",
 				cls: "friend-tracker-relationship-cell",
 			});
-			row.createEl("td", { text: contact.lastInteraction || "" });
+			const lastInteractionCell = row.createEl("td", {
+				text: contact.lastInteraction || "",
+			});
+			if (contact.lastInteraction && contact.lastInteractionSource) {
+				lastInteractionCell.setAttr(
+					"aria-label",
+					`来自笔记「${contact.lastInteractionSource}」`
+				);
+			}
 
 			// Actions cell
 			const actionsCell = row.createEl("td", {
@@ -153,7 +162,7 @@ export class TableView {
 			// Delete button
 			const deleteButton = actionsCell.createEl("button", {
 				cls: "friend-tracker-delete-button",
-				attr: { "aria-label": "Remove contact" },
+				attr: { "aria-label": "删除联系人" },
 			});
 			setIcon(deleteButton, "trash");
 
@@ -194,16 +203,34 @@ export class TableView {
 	private sortContacts(contacts: ContactWithCountdown[], sort: SortConfig) {
 		return [...contacts].sort((a, b) => {
 			if (sort.column === "birthday") {
-				// Extract month and day from birthday strings
-				const dateA = new Date(a.birthday);
-				const dateB = new Date(b.birthday);
+				// 按「月-日」排序，支持不填出生年份的生日
+				const parsedA = parseBirthday(a.birthday);
+				const parsedB = parseBirthday(b.birthday);
 
-				const aValue = (dateA.getMonth() + 1) * 100 + dateA.getDate();
-				const bValue = (dateB.getMonth() + 1) * 100 + dateB.getDate();
+				if (!parsedA && !parsedB) return 0;
+				if (!parsedA) return 1;
+				if (!parsedB) return -1;
+
+				const aValue = parsedA.month * 100 + parsedA.day;
+				const bValue = parsedB.month * 100 + parsedB.day;
 
 				return sort.direction === "asc"
 					? aValue - bValue
 					: bValue - aValue;
+			}
+
+			// 最近互动按时间戳排序（提及模式下为按提及推算出的时间）
+			if (sort.column === "lastInteraction") {
+				const aTime = a.lastInteractionTime;
+				const bTime = b.lastInteractionTime;
+
+				if (aTime === null && bTime === null) return 0;
+				if (aTime === null) return 1;
+				if (bTime === null) return -1;
+
+				return sort.direction === "asc"
+					? aTime - bTime
+					: bTime - aTime;
 			}
 
 			// Add special handling for daysUntilBirthday

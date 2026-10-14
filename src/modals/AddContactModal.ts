@@ -3,7 +3,8 @@ import type FriendTracker from "@/main";
 import { stringifyYaml } from "obsidian";
 import { VIEW_TYPE_FRIEND_TRACKER } from "@/views/FriendTrackerView";
 import { FriendTrackerView } from "@/views/FriendTrackerView";
-import { createRelationshipInput } from "@/components/ContactFields";
+import { createBirthdayInput, createRelationshipInput } from "@/components/ContactFields";
+import { parseAliases } from "@/utils/aliases";
 
 export class AddContactModal extends Modal {
 	constructor(app: App, private plugin: FriendTracker) {
@@ -13,7 +14,7 @@ export class AddContactModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Add new contact" });
+		contentEl.createEl("h2", { text: "添加新联系人" });
 
 		const form = contentEl.createEl("form", {
 			cls: "friend-tracker-add-contact-form",
@@ -21,38 +22,44 @@ export class AddContactModal extends Modal {
 
 		// Name field (required)
 		const nameField = form.createDiv({ cls: "friend-tracker-modal-field" });
-		nameField.createEl("label", { text: "Name *" });
+		nameField.createEl("label", { text: "姓名 *" });
 		const nameInput = nameField.createEl("input", {
 			attr: {
 				type: "text",
 				name: "name",
 				required: true,
-				placeholder: "Contact name",
+				placeholder: "联系人姓名",
 			},
 			cls: "friend-tracker-modal-input",
 		});
 		nameInput.focus();
 
+		// Aliases field
+		const aliasesField = form.createDiv({
+			cls: "friend-tracker-modal-field",
+		});
+		aliasesField.createEl("label", { text: "别名" });
+		const aliasesInput = aliasesField.createEl("input", {
+			attr: {
+				type: "text",
+				name: "aliases",
+				placeholder: "多个别名用逗号分隔",
+			},
+			cls: "friend-tracker-modal-input",
+		});
+
 		// Birthday field
 		const birthdayField = form.createDiv({
 			cls: "friend-tracker-modal-field",
 		});
-		birthdayField.createEl("label", { text: "Birthday" });
-		const birthdayInput = birthdayField.createEl("input", {
-			attr: {
-				type: "date",
-				name: "birthday",
-				placeholder: "YYYY-MM-DD",
-				pattern: "\\d{4}-\\d{2}-\\d{2}",
-			},
-			cls: "friend-tracker-modal-input",
-		});
+		birthdayField.createEl("label", { text: "生日" });
+		const birthdayInput = createBirthdayInput(birthdayField);
 
 		// Email field
 		const emailField = form.createDiv({
 			cls: "friend-tracker-modal-field",
 		});
-		emailField.createEl("label", { text: "Email" });
+		emailField.createEl("label", { text: "邮箱" });
 		const emailInput = emailField.createEl("input", {
 			attr: {
 				type: "email",
@@ -66,12 +73,12 @@ export class AddContactModal extends Modal {
 		const phoneField = form.createDiv({
 			cls: "friend-tracker-modal-field",
 		});
-		phoneField.createEl("label", { text: "Phone" });
+		phoneField.createEl("label", { text: "电话" });
 		const phoneInput = phoneField.createEl("input", {
 			attr: {
 				type: "tel",
 				name: "phone",
-				placeholder: "000-000-0000",
+				placeholder: "13800000000",
 			},
 			cls: "friend-tracker-modal-input",
 		});
@@ -80,7 +87,7 @@ export class AddContactModal extends Modal {
 		const relationshipField = form.createDiv({
 			cls: "friend-tracker-modal-field",
 		});
-		relationshipField.createEl("label", { text: "Relationship" });
+		relationshipField.createEl("label", { text: "关系" });
 		const relationshipInput = createRelationshipInput(
 			relationshipField,
 			this.plugin
@@ -88,18 +95,29 @@ export class AddContactModal extends Modal {
 
 		// Submit button
 		form.createEl("button", {
-			text: "Create contact",
+			text: "创建联系人",
 			attr: { type: "submit" },
 			cls: "friend-tracker-button button-primary",
 		});
 
 		form.addEventListener("submit", (e) => {
 			e.preventDefault();
-			const data: Record<string, string> = {
+			const data: Record<string, string | string[]> = {
 				name: nameInput.value,
 			};
 
-			if (birthdayInput.value) data.birthday = birthdayInput.value;
+			const aliases = parseAliases(aliasesInput.value);
+			if (aliases.length > 0) data.aliases = aliases;
+
+			if (!birthdayInput.isValid()) {
+				new Notice(
+					"生日填写有误：月份和日期请使用类似 08-16 的写法，年份请填 4 位数字。"
+				);
+				return;
+}
+
+const birthday = birthdayInput.getValue();
+if (birthday) data.birthday = birthday;
 			if (emailInput.value) data.email = emailInput.value;
 			if (phoneInput.value) data.phone = phoneInput.value;
 			if (relationshipInput.value) {
@@ -131,7 +149,7 @@ export class AddContactModal extends Modal {
 		});
 	}
 
-	private async onSubmit(data: Record<string, string>) {
+	private async onSubmit(data: Record<string, string | string[]>) {
 		const fileName = `${data.name}.md`;
 		const filePath = `${this.plugin.settings.contactsFolder}/${fileName}`;
 
@@ -164,9 +182,9 @@ export class AddContactModal extends Modal {
 				}
 			}
 
-			new Notice(`Created contact: ${data.name}`);
+			new Notice(`已创建联系人：${data.name}`);
 		} catch (error) {
-			new Notice(`Error creating contact: ${error}`);
+			new Notice(`创建联系人出错：${error}`);
 		}
 	}
 

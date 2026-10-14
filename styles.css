@@ -1133,3 +1133,109 @@ If your plugin does not need CSS, delete this file.
 	font-size: 0.9em;
 	line-height: 1.4;
 }
+
+/* 生日输入（支持只填月日） */
+.friend-tracker-birthday-inputs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+}
+
+.friend-tracker-birthday-inputs input {
+	flex: 1;
+	min-width: 120px;
+}
+
+.friend-tracker-birthday-inputs .friend-tracker-birthday-year {
+	max-width: 170px;
+}
+
+.friend-tracker-birthday-hint {
+	flex-basis: 100%;
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
+
+.friend-tracker-birthday-inputs input.is-invalid {
+	border-color: var(--text-error);
+	border-bottom-color: var(--text-error);
+}
+
+.friend-tracker-modal-field .friend-tracker-birthday-inputs input {
+	background: var(--background-modifier-form-field);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 8px;
+	color: var(--text-normal);
+}
+
+.friend-tracker-modal-field .friend-tracker-birthday-inputs input:focus {
+	border-color: var(--interactive-accent);
+}
+
+/* 提及记录模式 */
+.contact-mentions-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 4px 0 8px;
+}
+
+.contact-mention-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	cursor: pointer;
+}
+
+.contact-mention-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.contact-mention-source {
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
+
+.contact-mention-text {
+	line-height: 1.4;
+	word-break: break-word;
+	-webkit-user-select: text;
+	user-select: text;
+}
+
+.contact-mention-text mark {
+	background: var(--text-highlight-bg);
+	color: inherit;
+	padding: 0 2px;
+	border-radius: 2px;
+}
+
+/* 提及记录的排序菜单 */
+.contact-mentions-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+.friend-tracker-menu-chevron {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 4px;
+}
+
+.friend-tracker-menu-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
+.contact-mention-alias-tag {
+	color: var(--text-accent);
+}

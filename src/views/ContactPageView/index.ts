@@ -8,14 +8,17 @@ import {
 	MarkdownRenderer,
 } from "obsidian";
 import type FriendTracker from "@/main";
-import { ContactFields } from "@/components/ContactFields";
+import { ContactFields, createBirthdayInput } from "@/components/ContactFields";
 import { InteractionView } from "@/components/InteractionView";
+import { MentionsView } from "@/components/MentionsView";
 import type { Interaction } from "@/types";
 import { AddFieldModal } from "@/modals/AddFieldModal";
 import { InteractionModal } from "@/modals/InteractionModal";
 import { VIEW_TYPE_FRIEND_TRACKER } from "@/views/FriendTrackerView";
 import { FriendTrackerView } from "@/views/FriendTrackerView";
-import { STANDARD_FIELDS, SYSTEM_FIELDS } from "@/constants";
+import { STANDARD_FIELDS, SYSTEM_FIELDS, getFieldLabel } from "@/constants";
+import { formatBirthdayText, parseBirthday } from "@/utils/birthday";
+import { formatAliases, parseAliases } from "@/utils/aliases";
 
 export const VIEW_TYPE_CONTACT_PAGE = "contact-page-view";
 
@@ -24,6 +27,7 @@ export class ContactPageView extends ItemView {
 	private contactData: any = {};
 	private contactFields: ContactFields;
 	private interactionView: InteractionView;
+	private mentionsView: MentionsView;
 	public plugin: FriendTracker;
 	private activeTab: "notes" | "interactions" | "markdown";
 
@@ -47,6 +51,7 @@ export class ContactPageView extends ItemView {
 		this.plugin = _plugin;
 		this.contactFields = new ContactFields(this);
 		this.interactionView = new InteractionView(this);
+		this.mentionsView = new MentionsView(this);
 		this.activeTab = this.plugin.settings.defaultActiveTab;
 	}
 
@@ -55,7 +60,7 @@ export class ContactPageView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return this._file?.basename || "Contact";
+		return this._file?.basename || "联系人";
 	}
 
 	get file() {
@@ -87,7 +92,7 @@ export class ContactPageView extends ItemView {
 			const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
 			this.contactData = yamlMatch ? parseYaml(yamlMatch[1]) : {};
 		} catch (error) {
-			console.error(`Error reading contact file ${file.path}:`, error);
+			console.error(`读取联系人文件出错：${file.path}`, error);
 			this.contactData = {};
 		}
 		// Only render if still the same file
@@ -102,7 +107,7 @@ export class ContactPageView extends ItemView {
 
 		if (!this.contactData || !this.contactData.name) {
 			container.createEl("div", {
-				text: "No contact data available",
+				text: "暂无联系人数据",
 				cls: "contact-empty-state",
 			});
 			return;
@@ -129,11 +134,11 @@ export class ContactPageView extends ItemView {
 		});
 
 		const tabs = [
-			{ id: "notes" as const, icon: "pencil", label: "Notes" },
+			{ id: "notes" as const, icon: "pencil", label: "笔记" },
 			{
 				id: "interactions" as const,
 				icon: "clock",
-				label: "Interactions",
+				label: "互动记录",
 			},
 			{
 				id: "markdown" as const,
@@ -191,13 +196,13 @@ export class ContactPageView extends ItemView {
 		});
 
 		const nameText = editContainer.createEl("h1", {
-			text: this.contactData.name || "Unnamed Contact",
+			text: this.contactData.name || "未命名联系人",
 		});
 
 		const nameInput = editContainer.createEl("input", {
 			type: "text",
 			value: this.contactData.name || "",
-			placeholder: "Contact name",
+			placeholder: "联系人姓名",
 			cls: "contact-name-input",
 		});
 
@@ -207,45 +212,61 @@ export class ContactPageView extends ItemView {
 		setIcon(editButton, "pencil");
 
 		// Add age display if birthday exists
-		if (this.contactData.birthday) {
-			const ageText = this.plugin.contactOperations.calculateDetailedAge(
-				this.contactData.birthday
-			);
-			nameDisplay.createEl("span", {
-				text: ageText,
-				cls: "contact-age-display",
-			});
+		const parsedBirthday = parseBirthday(this.contactData.birthday);
+		if (parsedBirthday) {
+			const birthYear = parsedBirthday.year;
+			const birthMonth = parsedBirthday.month;
+			const birthDay = parsedBirthday.day;
 
-			// Add both zodiac displays
-			const [year, month, day] = this.contactData.birthday
-				.split("-")
-				.map(Number);
+			// 只有知道出生年份时才显示年龄
+			if (birthYear) {
+				const ageText =
+					this.plugin.contactOperations.calculateDetailedAge(
+						this.contactData.birthday
+					);
+				if (ageText) {
+					nameDisplay.createEl("span", {
+						text: ageText,
+						cls: "contact-age-display",
+					});
+				}
+			}
+
+			// Add zodiac displays
 			const animals = [
-				"Rat",
-				"Ox",
-				"Tiger",
-				"Rabbit",
-				"Dragon",
-				"Snake",
-				"Horse",
-				"Goat",
-				"Monkey",
-				"Rooster",
-				"Dog",
-				"Pig",
+				"鼠",
+				"牛",
+				"虎",
+				"兔",
+				"龙",
+				"蛇",
+				"马",
+				"羊",
+				"猴",
+				"鸡",
+				"狗",
+				"猪",
 			];
-			const chineseZodiac = animals[(year - 4) % 12];
-			const westernZodiac = this.getZodiacSign(month, day);
+			const westernZodiac = this.getZodiacSign(birthMonth, birthDay);
+			const season = this.getSeason(birthMonth, birthDay);
+			const birthstone = this.getBirthstone(birthMonth);
 
-			const season = this.getSeason(month, day);
-			const birthstone = this.getBirthstone(month);
+			if (birthYear) {
+				const chineseZodiac =
+					animals[(((birthYear - 4) % 12) + 12) % 12];
+				nameDisplay.createEl("span", {
+					text: `${westernZodiac} · 属${chineseZodiac}`,
+					cls: "contact-age-display",
+				});
+			} else {
+				nameDisplay.createEl("span", {
+					text: `${westernZodiac} · 出生年份未知`,
+					cls: "contact-age-display",
+				});
+			}
 
 			nameDisplay.createEl("span", {
-				text: `${westernZodiac} • Year of the ${chineseZodiac}`,
-				cls: "contact-age-display",
-			});
-			nameDisplay.createEl("span", {
-				text: `${season} baby • Birthstone: ${birthstone}`,
+				text: `${season}出生 · 诞生石：${birthstone}`,
 				cls: "contact-age-display",
 			});
 
@@ -264,7 +285,7 @@ export class ContactPageView extends ItemView {
 						text: "🎂",
 					});
 					countdownContainer.createSpan({
-						text: "Birthday today!",
+						text: "今天生日！",
 					});
 				} else {
 					// Show dot if within a week
@@ -282,8 +303,8 @@ export class ContactPageView extends ItemView {
 
 					const daysText =
 						daysUntil === 1
-							? "Birthday tomorrow!"
-							: `${daysUntil} days until birthday`;
+							? "明天生日！"
+							: `距离生日还有 ${daysUntil} 天`;
 
 					countdownContainer.createSpan({
 						text: daysText,
@@ -318,7 +339,7 @@ export class ContactPageView extends ItemView {
 							this._file,
 							newPath
 						);
-						new Notice(`Updated contact name`);
+						new Notice(`已更新联系人姓名`);
 
 						// Refresh Friend Tracker view
 						const friendTrackerLeaves =
@@ -333,11 +354,11 @@ export class ContactPageView extends ItemView {
 							}
 						}
 					} catch (error) {
-						new Notice(`Error updating file name: ${error}`);
+						new Notice(`更新文件名出错：${error}`);
 					}
 				}
 			}
-			nameText.textContent = nameInput.value || "Unnamed Contact";
+			nameText.textContent = nameInput.value || "未命名联系人";
 			nameText.classList.remove("editing");
 			nameInput.classList.remove("editing");
 			setIcon(editButton, "pencil");
@@ -377,9 +398,9 @@ export class ContactPageView extends ItemView {
 
 		// Format the output
 		if (days === 0) {
-			return `${years} years, ${months} months old`;
+			return `${years} 岁 ${months} 个月`;
 		}
-		return `${years} years, ${months} months, ${days} days old`;
+		return `${years} 岁 ${months} 个月 ${days} 天`;
 	}
 
 	private calculateDaysUntilBirthday(birthday: string): number | null {
@@ -390,28 +411,28 @@ export class ContactPageView extends ItemView {
 
 	private getZodiacSign(month: number, day: number): string {
 		if ((month === 3 && day >= 21) || (month === 4 && day <= 19))
-			return "Aries";
+			return "白羊座";
 		if ((month === 4 && day >= 20) || (month === 5 && day <= 20))
-			return "Taurus";
+			return "金牛座";
 		if ((month === 5 && day >= 21) || (month === 6 && day <= 20))
-			return "Gemini";
+			return "双子座";
 		if ((month === 6 && day >= 21) || (month === 7 && day <= 22))
-			return "Cancer";
+			return "巨蟹座";
 		if ((month === 7 && day >= 23) || (month === 8 && day <= 22))
-			return "Leo";
+			return "狮子座";
 		if ((month === 8 && day >= 23) || (month === 9 && day <= 22))
-			return "Virgo";
+			return "处女座";
 		if ((month === 9 && day >= 23) || (month === 10 && day <= 22))
-			return "Libra";
+			return "天秤座";
 		if ((month === 10 && day >= 23) || (month === 11 && day <= 21))
-			return "Scorpio";
+			return "天蝎座";
 		if ((month === 11 && day >= 22) || (month === 12 && day <= 21))
-			return "Sagittarius";
+			return "射手座";
 		if ((month === 12 && day >= 22) || (month === 1 && day <= 19))
-			return "Capricorn";
+			return "摩羯座";
 		if ((month === 1 && day >= 20) || (month === 2 && day <= 18))
-			return "Aquarius";
-		return "Pisces";
+			return "水瓶座";
+		return "双鱼座";
 	}
 
 	private getSeason(month: number, day: number): string {
@@ -422,40 +443,40 @@ export class ContactPageView extends ItemView {
 			month === 5 ||
 			(month === 6 && day < 21)
 		)
-			return "Spring";
+			return "春季";
 		if (
 			(month === 6 && day >= 21) ||
 			month === 7 ||
 			month === 8 ||
 			(month === 9 && day < 22)
 		)
-			return "Summer";
+			return "夏季";
 		if (
 			(month === 9 && day >= 22) ||
 			month === 10 ||
 			month === 11 ||
 			(month === 12 && day < 21)
 		)
-			return "Autumn";
-		return "Winter";
+			return "秋季";
+		return "冬季";
 	}
 
 	private getBirthstone(month: number): string {
 		const stones: Record<number, string> = {
-			1: "Garnet",
-			2: "Amethyst",
-			3: "Aquamarine",
-			4: "Diamond",
-			5: "Emerald",
-			6: "Pearl",
-			7: "Ruby",
-			8: "Peridot",
-			9: "Sapphire",
-			10: "Opal",
-			11: "Topaz",
-			12: "Turquoise",
+			1: "石榴石",
+			2: "紫水晶",
+			3: "海蓝宝石",
+			4: "钻石",
+			5: "祖母绿",
+			6: "珍珠",
+			7: "红宝石",
+			8: "橄榄石",
+			9: "蓝宝石",
+			10: "欧泊",
+			11: "托帕石",
+			12: "绿松石",
 		};
-		return stones[month] || "Unknown";
+		return stones[month] || "未知";
 	}
 
 	private renderInfoSection(container: HTMLElement) {
@@ -485,6 +506,13 @@ export class ContactPageView extends ItemView {
 				)
 				.forEach(([key, value]) => {
 					if (!value) return; // Skip empty values
+					if (
+						key === "aliases" &&
+						Array.isArray(value) &&
+						value.length === 0
+					) {
+						return;
+					}
 
 					const field = fieldsContainer.createEl("div", {
 						cls: "contact-field-view",
@@ -495,24 +523,15 @@ export class ContactPageView extends ItemView {
 
 					field.createEl("div", {
 						cls: "contact-field-label",
-						text: key,
+						text: getFieldLabel(key),
 					});
 
-					// Format birthday in view mode
+					// 生日与别名做特殊展示
 					const displayValue =
 						key === "birthday" && value
-							? (() => {
-									const [year, month, day] = (value as string)
-										.split("-")
-										.map(Number);
-									const date = new Date(year, month - 1, day);
-									date.setHours(0, 0, 0, 0);
-									return date.toLocaleDateString("en-US", {
-										month: "long",
-										day: "numeric",
-										year: "numeric",
-									});
-							  })()
+							? formatBirthdayText(value)
+							: key === "aliases"
+							? formatAliases(value)
 							: value;
 
 					field.createEl("div", {
@@ -524,7 +543,7 @@ export class ContactPageView extends ItemView {
 			// Add edit button at the bottom
 			const editButton = fieldsContainer.createEl("button", {
 				cls: "friend-tracker-button",
-				text: "Edit",
+				text: "编辑",
 			});
 
 			editButton.addEventListener("click", () => {
@@ -563,7 +582,7 @@ export class ContactPageView extends ItemView {
 			// Add custom field button
 			const addFieldButton = fieldsContainer.createEl("button", {
 				cls: "friend-tracker-button button-outlined",
-				text: "Add custom field",
+				text: "添加自定义字段",
 			});
 			addFieldButton.addEventListener("click", () => {
 				this.openAddFieldModal();
@@ -572,7 +591,7 @@ export class ContactPageView extends ItemView {
 			// Add done button
 			const doneButton = fieldsContainer.createEl("button", {
 				cls: "friend-tracker-button button-primary button-full-width",
-				text: "Done",
+				text: "完成",
 			});
 
 			doneButton.addEventListener("click", async () => {
@@ -595,14 +614,40 @@ export class ContactPageView extends ItemView {
 		});
 
 		fieldContainer.createEl("label", {
-			text: field,
+			text: getFieldLabel(field),
 		});
+
+		if (field === "aliases") {
+			const aliasInput = fieldContainer.createEl("input", {
+				cls: "contact-field-input",
+				attr: {
+					type: "text",
+					placeholder: "别名，多个用逗号分隔",
+					value: formatAliases(value),
+				},
+			});
+			aliasInput.addEventListener("change", () => {
+				const aliases = parseAliases(aliasInput.value);
+				this.updateContactData(
+					field,
+					aliases.length > 0 ? aliases : ""
+				);
+			});
+			return;
+		}
+
+		if (field === "birthday") {
+			createBirthdayInput(fieldContainer, value, (newValue) => {
+				this.updateContactData(field, newValue);
+			});
+			return;
+		}
 
 		const input = fieldContainer.createEl("input", {
 			cls: "contact-field-input",
 			attr: {
-				type: field === "birthday" ? "date" : "text",
-				placeholder: `Enter ${field.toLowerCase()}`,
+				type: "text",
+				placeholder: `输入${getFieldLabel(field)}`,
 				value: value || "",
 				...(field === "relationship" && {
 					list: "relationship-types",
@@ -624,7 +669,7 @@ export class ContactPageView extends ItemView {
 			cls: "contact-notes-input",
 			attr: {
 				placeholder:
-					"Add notes about family members, parents' names, or anything else you want to remember...",
+					"记录家人信息、父母姓名，或任何你想记住的内容……",
 			},
 		});
 		notesInput.value = this.contactData.notes || "";
@@ -645,6 +690,12 @@ export class ContactPageView extends ItemView {
 	}
 
 	private renderInteractionsSection(container: HTMLElement) {
+		if (this.plugin.settings.interactionMode === "mentions") {
+			const name = this.contactData.name || this._file?.basename || "";
+			const aliases = parseAliases(this.contactData.aliases);
+			void this.mentionsView.render(container, [name, ...aliases]);
+			return;
+		}
 		const interactions = container.createEl("div", {
 			cls: "contact-interactions",
 		});
@@ -660,13 +711,13 @@ export class ContactPageView extends ItemView {
 		) {
 			headerContainer.createEl("div", {
 				cls: "section-helper-text",
-				text: "Log meaningful touchpoints like meetings, calls, or important conversations to help maintain strong relationships",
+				text: "记录重要的联系时刻，例如见面、通话或重要交谈，帮助你维系良好的人际关系",
 			});
 		}
 
 		const addButton = headerContainer.createEl("button", {
 			cls: "friend-tracker-button button-align-right",
-			text: "Add interaction",
+			text: "添加互动记录",
 		});
 		addButton.addEventListener("click", () => {
 			this.openAddInteractionModal();
@@ -699,13 +750,13 @@ export class ContactPageView extends ItemView {
 		if (!extrasContent.trim()) {
 			headerContainer.createEl("div", {
 				cls: "section-helper-text",
-				text: "Add formatted text, links, and other Markdown content",
+				text: "添加格式化文本、链接和其他 Markdown 内容",
 			});
 		}
 
 		const editButton = headerContainer.createEl("button", {
 			cls: "friend-tracker-button button-align-right",
-			text: "Edit markdown",
+			text: "编辑 Markdown",
 		});
 
 		editButton.addEventListener("click", () => {
@@ -755,7 +806,7 @@ export class ContactPageView extends ItemView {
 			}
 		} catch (error) {
 			console.error(
-				`Error reading extras from file ${this._file.path}:`,
+				`读取附加内容出错：${this._file.path}`,
 				error
 			);
 		}
@@ -797,7 +848,7 @@ export class ContactPageView extends ItemView {
 				await this.saveContactData();
 				this.render();
 			} else {
-				new Notice("Field already exists!");
+				new Notice("该字段已存在！");
 			}
 		});
 		modal.open();
@@ -844,7 +895,7 @@ export class ContactPageView extends ItemView {
 		this.render();
 	}
 
-	async updateContactData(field: string, value: string) {
+	async updateContactData(field: string, value: string | string[]) {
 		this.contactData[field] = value;
 		await this.saveContactData();
 	}

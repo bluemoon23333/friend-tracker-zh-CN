@@ -11,7 +11,7 @@ export class AddFieldModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Add custom field" });
+		contentEl.createEl("h2", { text: "添加自定义字段" });
 
 		const form = contentEl.createEl("form");
 		form.addEventListener("submit", (e) => {
@@ -26,15 +26,15 @@ export class AddFieldModal extends Modal {
 		const input = form.createEl("input", {
 			attr: {
 				type: "text",
-				placeholder: "Field name",
-				pattern: "[a-zA-Z][a-zA-Z0-9]*",
+				placeholder: "字段名称",
+				pattern: "[a-zA-Z\\u4e00-\\u9fa5][a-zA-Z0-9\\u4e00-\\u9fa5]*",
 			},
 			cls: "contact-field-input",
 		});
 		input.focus();
 
 		form.createEl("button", {
-			text: "Add field",
+			text: "添加字段",
 			attr: { type: "submit" },
 			cls: "friend-tracker-button button-primary button-full-width",
 		});

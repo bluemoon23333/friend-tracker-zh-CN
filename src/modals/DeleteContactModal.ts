@@ -12,9 +12,9 @@ export class DeleteContactModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Delete contact" });
+		contentEl.createEl("h2", { text: "删除联系人" });
 		contentEl.createEl("p", {
-			text: `Are you sure you want to delete ${this.file.basename}?`,
+			text: `确定要删除「${this.file.basename}」吗？`,
 		});
 
 		const buttonContainer = contentEl.createEl("div", {
@@ -23,14 +23,14 @@ export class DeleteContactModal extends Modal {
 
 		// Cancel button
 		const cancelButton = buttonContainer.createEl("button", {
-			text: "Cancel",
+			text: "取消",
 			cls: "friend-tracker-modal-button",
 		});
 		cancelButton.addEventListener("click", () => this.close());
 
 		// Delete button
 		const deleteButton = buttonContainer.createEl("button", {
-			text: "Delete",
+			text: "删除",
 			cls: "friend-tracker-modal-button friend-tracker-modal-button-danger",
 		});
 		deleteButton.addEventListener("click", async () => {

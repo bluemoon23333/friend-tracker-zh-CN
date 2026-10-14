@@ -10,14 +10,24 @@ import {
 } from "@/views/ContactPageView";
 import { FriendTrackerSettingTab } from "./views/FriendTrackerView/settings";
 import { ContactOperations } from "@/services/ContactOperations";
+import { MentionIndex } from "@/services/MentionIndex";
 
 export default class FriendTracker extends Plugin {
 	settings: FriendTrackerSettings;
 	public contactOperations: ContactOperations;
+	public mentionIndex: MentionIndex;
 
 	async onload() {
 		await this.loadSettings();
 		this.contactOperations = new ContactOperations(this);
+		this.mentionIndex = new MentionIndex(this);
+
+		// 库内容变化时让「提及索引」失效，下次读取联系人时重建
+		const invalidateMentionIndex = () => this.mentionIndex.invalidate();
+		this.registerEvent(this.app.vault.on("create", invalidateMentionIndex));
+		this.registerEvent(this.app.vault.on("modify", invalidateMentionIndex));
+		this.registerEvent(this.app.vault.on("delete", invalidateMentionIndex));
+		this.registerEvent(this.app.vault.on("rename", invalidateMentionIndex));
 
 		// On mobile, we should wait for layout-ready
 		this.app.workspace.onLayoutReady(() => {
@@ -39,7 +49,7 @@ export default class FriendTracker extends Plugin {
 			);
 
 			// Add ribbon icon
-			this.addRibbonIcon("user", "Open friend tracker", async () => {
+			this.addRibbonIcon("user", "打开好友追踪", async () => {
 				const workspace = this.app.workspace;
 				const leaves = workspace.getLeavesOfType(
 					VIEW_TYPE_FRIEND_TRACKER
@@ -62,7 +72,7 @@ export default class FriendTracker extends Plugin {
 					});
 					workspace.revealLeaf(leaf);
 				} else {
-					new Notice("Could not create Friend Tracker view");
+					new Notice("无法创建好友追踪视图");
 				}
 			});
 
@@ -72,8 +82,8 @@ export default class FriendTracker extends Plugin {
 			// Check for birthdays after everything is initialized
 			await this.checkBirthdays();
 		} catch (error) {
-			console.error("Friend Tracker failed to load:", error);
-			new Notice("Friend Tracker failed to load: " + error.message);
+			console.error("好友追踪加载失败：", error);
+			new Notice("好友追踪加载失败：" + error.message);
 		}
 	}
 
@@ -86,32 +96,32 @@ export default class FriendTracker extends Plugin {
 		if (birthdayContacts.length > 0) {
 			if (birthdayContacts.length === 1) {
 				new Notice(
-					`🎂 It's ${birthdayContacts[0].name}'s birthday today!`,
-					8000 // Show for 8 seconds
+					`🎂 今天是 ${birthdayContacts[0].name} 的生日！`,
+					8000 // 显示 8 秒
 				);
 			} else {
 				const names = birthdayContacts.map((c) => c.name);
 				const lastPerson = names.pop();
-				const nameList = names.join(", ") + " and " + lastPerson;
-				new Notice(`🎂 It's ${nameList}'s birthday today!`, 8000);
+				const nameList = names.join("、") + "和" + lastPerson;
+				new Notice(`🎂 今天是 ${nameList} 的生日！`, 8000);
 			}
 		}
 
-		// Optional: Also notify about tomorrow's birthdays
+		// 可选：同时提醒明天的生日
 		const tomorrowBirthdays = contacts.filter(
 			(c) => c.daysUntilBirthday === 1
 		);
 		if (tomorrowBirthdays.length > 0) {
 			if (tomorrowBirthdays.length === 1) {
 				new Notice(
-					`🎈 ${tomorrowBirthdays[0].name}'s birthday is tomorrow!`,
-					6000 // Show for 6 seconds (slightly shorter for tomorrow's)
+					`🎈 明天是 ${tomorrowBirthdays[0].name} 的生日！`,
+					6000 // 显示 6 秒（明天的生日提醒稍短一些）
 				);
 			} else {
 				const names = tomorrowBirthdays.map((c) => c.name);
 				const lastPerson = names.pop();
-				const nameList = names.join(", ") + " and " + lastPerson;
-				new Notice(`🎈 ${nameList}'s birthdays are tomorrow!`, 6000);
+				const nameList = names.join("、") + "和" + lastPerson;
+				new Notice(`🎈 明天是 ${nameList} 的生日！`, 6000);
 			}
 		}
 	}

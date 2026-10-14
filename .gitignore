@@ -20,3 +20,6 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# 本地构建产物（安装包可直接从 dist 取用，不入库）
+dist/

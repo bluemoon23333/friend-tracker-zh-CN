@@ -1,6 +1,12 @@
 import { Notice, TFile, parseYaml } from "obsidian";
 import type FriendTracker from "@/main";
 import type { ContactWithCountdown } from "@/types";
+import { parseBirthday } from "@/utils/birthday";
+import { parseAliases } from "@/utils/aliases";
+import {
+	formatDaysAgo,
+	parseDateToLocalMidnight,
+} from "@/utils/dates";
 
 export class ContactOperations {
 	constructor(private plugin: FriendTracker) {}
@@ -11,7 +17,7 @@ export class ContactOperations {
 		const folderPath = vault.getFolderByPath(folder);
 
 		if (!folderPath) {
-			new Notice("Friend Tracker folder not found.");
+			new Notice("未找到好友追踪文件夹。");
 			return [];
 		}
 
@@ -31,13 +37,17 @@ export class ContactOperations {
 				if (yamlMatch) {
 					const metadata = parseYaml(yamlMatch[1]);
 
-					const lastInteraction =
+					const manualInteractionDate =
 						metadata.interactions?.length > 0
-							? this.formatDaysAgo(metadata.interactions[0].date)
+							? metadata.interactions[0].date
 							: null;
+					const manualInteractionTime = parseDateToLocalMidnight(
+						manualInteractionDate
+					);
 
 					contacts.push({
-						name: metadata.name || "Unknown",
+						name: metadata.name || "未知",
+						aliases: parseAliases(metadata.aliases ?? metadata.alias),
 						birthday: metadata.birthday || "",
 						formattedBirthday: this.formatBirthday(
 							metadata.birthday
@@ -47,15 +57,42 @@ export class ContactOperations {
 						daysUntilBirthday: this.calculateDaysUntilBirthday(
 							metadata.birthday
 						),
-						lastInteraction,
+						lastInteraction:
+							manualInteractionTime !== null
+								? formatDaysAgo(manualInteractionTime)
+								: null,
+						lastInteractionTime: manualInteractionTime,
+						lastInteractionSource: null,
 						file,
 					});
 				}
 			} catch (error) {
 				console.error(
-					`Error reading contact file ${file.path}:`,
+					`读取联系人文件出错：${file.path}`,
 					error
 				);
+			}
+		}
+
+		// 「提及记录」模式下，用库中的提及推算「最近互动」
+		if (this.plugin.settings.interactionMode === "mentions") {
+			const summaries = await this.plugin.mentionIndex.getSummaries(
+				contacts
+			);
+
+			for (const contact of contacts) {
+				const summary = summaries.get(contact.file.path);
+				if (!summary) continue;
+
+				// 提及比手动记录更近时才覆盖
+				if (
+					contact.lastInteractionTime === null ||
+					summary.time > contact.lastInteractionTime
+				) {
+					contact.lastInteraction = formatDaysAgo(summary.time);
+					contact.lastInteractionTime = summary.time;
+					contact.lastInteractionSource = summary.source;
+				}
 			}
 		}
 
@@ -63,13 +100,11 @@ export class ContactOperations {
 	}
 
 	private calculateAge(birthday: string): number | null {
-		if (!birthday) return null;
+		const parsed = parseBirthday(birthday);
+		if (!parsed || !parsed.year) return null;
 
 		// Parse the birthday and set it to local midnight
-		const [birthYear, birthMonth, birthDay] = birthday
-			.split("-")
-			.map(Number);
-		const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
+		const birthDate = new Date(parsed.year, parsed.month - 1, parsed.day);
 		birthDate.setHours(0, 0, 0, 0);
 
 		if (isNaN(birthDate.getTime())) return null;
@@ -91,13 +126,11 @@ export class ContactOperations {
 	}
 
 	public calculateDetailedAge(birthday: string): string {
-		if (!birthday) return "";
+		const parsed = parseBirthday(birthday);
+		if (!parsed || !parsed.year) return "";
 
 		// Parse the birthday and set it to local midnight
-		const [birthYear, birthMonth, birthDay] = birthday
-			.split("-")
-			.map(Number);
-		const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
+		const birthDate = new Date(parsed.year, parsed.month - 1, parsed.day);
 		birthDate.setHours(0, 0, 0, 0);
 
 		if (isNaN(birthDate.getTime())) return "";
@@ -129,52 +162,35 @@ export class ContactOperations {
 		}
 
 		// Format the output
-		const parts = [];
+		const parts: string[] = [];
 
 		if (years > 0) {
-			parts.push(`${years} ${years === 1 ? "year" : "years"}`);
+			parts.push(`${years} 岁`);
 		}
 
 		if (months > 0) {
-			parts.push(`${months} ${months === 1 ? "month" : "months"}`);
+			parts.push(`${months} 个月`);
 		}
 
 		if (days > 0) {
-			parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+			parts.push(`${days} 天`);
 		}
 
-		return parts.join(", ") + " old";
+		return parts.length > 0 ? parts.join(" ") : "刚出生";
 	}
 
 	private formatBirthday(dateStr: string): string {
 		if (!dateStr) return "";
 
-		// Parse the birthday and set it to local midnight
-		const [birthYear, birthMonth, birthDay] = dateStr
-			.split("-")
-			.map(Number);
-		const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
-		birthDate.setHours(0, 0, 0, 0);
+		const parsed = parseBirthday(dateStr);
+		if (!parsed) return String(dateStr);
 
-		if (isNaN(birthDate.getTime())) return dateStr;
-
-		return birthDate.toLocaleDateString("en-US", {
-			month: "long",
-			day: "numeric",
-		});
+		return `${parsed.month}月${parsed.day}日`;
 	}
 
 	public calculateDaysUntilBirthday(birthday: string): number | null {
-		if (!birthday) return null;
-
-		// Parse the birthday and set it to local midnight
-		const [birthYear, birthMonth, birthDay] = birthday
-			.split("-")
-			.map(Number);
-		const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
-		birthDate.setHours(0, 0, 0, 0);
-
-		if (isNaN(birthDate.getTime())) return null;
+		const parsed = parseBirthday(birthday);
+		if (!parsed) return null;
 
 		// Get today at local midnight
 		const today = new Date();
@@ -183,8 +199,8 @@ export class ContactOperations {
 		// Create this year's birthday at local midnight
 		const thisYearBirthday = new Date(
 			today.getFullYear(),
-			birthDate.getMonth(),
-			birthDate.getDate()
+			parsed.month - 1,
+			parsed.day
 		);
 		thisYearBirthday.setHours(0, 0, 0, 0);
 
@@ -196,14 +212,5 @@ export class ContactOperations {
 		// Calculate days difference
 		const diffTime = thisYearBirthday.getTime() - today.getTime();
 		return Math.round(diffTime / (1000 * 60 * 60 * 24));
-	}
-
-	private formatDaysAgo(dateStr: string): string {
-		const date = new Date(dateStr);
-		const today = new Date();
-		const diffTime = today.getTime() - date.getTime();
-		const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-		return `${diffDays} days`;
 	}
 }
